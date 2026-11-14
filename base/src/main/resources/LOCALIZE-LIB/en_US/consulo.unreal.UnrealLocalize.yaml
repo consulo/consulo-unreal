@@ -1,0 +1,94 @@
+system.name:
+  text: "Unreal Engine"
+sdk.type.name:
+  text: "Unreal Engine"
+cpp.extension.name:
+  text: "Unreal Engine C++"
+cpp.extension.defines.label:
+  text: "Defines:"
+cpp.extension.include.paths.label:
+  text: "Include paths:"
+cpp.extension.cpp.standard.label:
+  text: "C++ standard:"
+task.build.description:
+  text: "Build the target with UnrealBuildTool"
+task.rebuild.description:
+  text: "Clean and build the target with UnrealBuildTool"
+task.clean.description:
+  text: "Delete the build products of the target"
+task.editor.description:
+  text: "Open the project in the Unreal Editor"
+task.game.description:
+  text: "Run the project as a game in a window"
+status.reading.project:
+  text: "Reading {0}..."
+status.exporting.modules:
+  text: "Exporting modules of {0} with UnrealBuildTool..."
+status.generating.compile.database:
+  text: "Collecting include paths and defines of {0}..."
+settings.engine.label:
+  text: "Engine:"
+settings.engine.auto:
+  text: "<Engine of the project>"
+settings.target.label:
+  text: "Target:"
+settings.target.auto:
+  text: "<Editor target>"
+settings.configuration.label:
+  text: "Configuration:"
+settings.index.engine.label:
+  text: "Index engine sources"
+warning.compile.database.failed:
+  text: "UnrealBuildTool could not produce the compile database, include paths are taken from the module rules only: {0}"
+error.no.project.file:
+  text: "There is no .uproject file in ''{0}''"
+error.bad.project.file:
+  text: "Cannot read ''{0}'': {1}"
+error.no.engine:
+  text: "Cannot find the Unreal Engine of the project (EngineAssociation ''{0}''). Add the engine in Settings | Platform | SDKs, or select it in the Unreal Engine settings of the project."
+error.no.build.script:
+  text: "There is no build script ''{0}'' in the engine"
+error.no.editor:
+  text: "There is no Unreal Editor ''{0}'' in the engine"
+error.command.failed:
+  text: "''{0}'' failed with exit code {1}"
+error.cannot.run:
+  text: "Cannot run ''{0}'': {1}"
+error.cancelled:
+  text: "''{0}'' was cancelled"
+error.unknown.task:
+  text: "Unknown Unreal Engine task ''{0}''"
+error.bad.output:
+  text: "Cannot read ''{0}'': {1}"
+rules.dotnet.extension.name:
+  text: ".NET (Unreal build scripts)"
+rules.csharp.extension.name:
+  text: "C# (Unreal build scripts)"
+run.configuration.type.name:
+  text: "Unreal Engine"
+run.configuration.type.description:
+  text: "Runs or debugs an Unreal project: the editor, the project as a game, or a built game target"
+run.configuration.fragment.name:
+  text: "Unreal Engine"
+run.configuration.mode.label:
+  text: "Run:"
+run.configuration.target.label:
+  text: "Target:"
+run.configuration.target.placeholder:
+  text: "<Game target named after the project>"
+run.configuration.configuration.label:
+  text: "Configuration:"
+run.configuration.editor.name:
+  text: "{0} Editor"
+run.configuration.game.name:
+  text: "{0} Game"
+run.configuration.no.project:
+  text: "The module is not imported from an Unreal project"
+run.configuration.no.executable:
+  text: "''{0}'' does not exist - build the target first"
+run.mode.editor:
+  text: "Editor"
+run.mode.game:
+  text: "Game (-game)"
+run.mode.standalone:
+  text: "Built game target"
