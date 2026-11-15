@@ -93,7 +93,7 @@ public final class UnrealEngine {
     public @Nullable Path findDotNetAssemblies() {
         Path dotNet = myHome.resolve("Engine").resolve("Binaries").resolve("ThirdParty").resolve("DotNet");
         String hostPrefix = myPlatform.os().isWindows() ? "win-" : myPlatform.os().isMac() ? "osx-" : "linux-";
-        String arch = CpuArchitecture.AARCH64.equals(myPlatform.jvm().arch()) ? "arm64" : "x64";
+        String arch = CpuArchitecture.AARCH64.equals(myPlatform.os().arch()) ? "arm64" : "x64";
         String host = hostPrefix + arch;
         List<Path> directories;
         try (Stream<Path> paths = Files.walk(dotNet, 7)) {
