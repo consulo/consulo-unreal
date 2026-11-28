@@ -31,6 +31,11 @@ public interface UnrealSettingsListener extends ExternalSystemSettingsListener<U
     default void onProjectRenamed(String oldName, String newName) {
     }
 
+    // every method is redeclared: the topic binding is generated from the methods of this interface only
+    @Override
+    default void onProjectsLoaded(Collection<UnrealProjectSettings> settings) {
+    }
+
     @Override
     default void onProjectsLinked(Collection<UnrealProjectSettings> settings) {
     }
