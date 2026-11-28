@@ -58,7 +58,8 @@ import static consulo.unreal.UnrealConstants.SYSTEM_ID;
  * <li>{@code <Project>.uproject} - the project directory, its build output excluded</li>
  * <li>one module per C++ module of the project and its plugins ({@code -Mode=JsonExport}), with the include paths and
  * defines its sources compile with ({@code -Mode=GenerateClangDatabase})</li>
- * <li>{@code UE <version>} - {@code Engine/Source}, so engine headers are indexed and resolve their own includes</li>
+ * <li>{@code UE <version>} - {@code Engine/Source/Programs} for the build scripts, exporting the library
+ * {@code UE <version> Sources} of {@code Engine/Source}, so engine headers are indexed and resolve their own includes</li>
  * </ul>
  */
 public class UnrealProjectResolver implements ExternalSystemProjectResolver<UnrealExecutionSettings> {
@@ -92,24 +93,7 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
         // Consulo modules are directory based: every module needs its own directory and a name of its own, and the
         // game module usually has the name of the project
         String projectModuleName = projectFile.name() + UnrealConstants.PROJECT_FILE_EXTENSION;
-        ModuleData projectModule = new ModuleData(projectModuleName, SYSTEM_ID, projectModuleName, projectDirectory.toString(), projectPath);
-        DataNode<ModuleData> projectModuleNode = projectNode.createChild(ProjectKeys.MODULE, projectModule);
-        ContentRootData projectRoot = new ContentRootData(SYSTEM_ID, projectDirectory.toString());
-        for (String excluded : UnrealConstants.EXCLUDED_DIRECTORIES) {
-            projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
-        }
-        for (String excluded : UnrealConstants.EXCLUDED_PROJECT_DIRECTORIES) {
-            projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
-        }
-        for (Path pluginDirectory : UnrealUtil.findPluginDirectories(projectDirectory)) {
-            for (String excluded : UnrealConstants.EXCLUDED_PLUGIN_DIRECTORIES) {
-                Path directory = pluginDirectory.resolve(excluded);
-                if (Files.isDirectory(directory)) {
-                    projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, directory.toString());
-                }
-            }
-        }
-        projectModuleNode.createChild(ProjectKeys.CONTENT_ROOT, projectRoot);
+        createProjectModule(projectNode, projectModuleName, projectDirectory, projectPath);
         projectNode.createChild(UnrealRunData.KEY, new UnrealRunData(projectModuleName, projectFile.name()));
 
         String target = UnrealUtil.findTarget(projectFile, settings == null ? null : settings.getTarget());
@@ -228,12 +212,41 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
     }
 
     /**
+     * The module of the project directory, its build output, packaging files and the build output of its plugins
+     * excluded.
+     */
+    static DataNode<ModuleData> createProjectModule(DataNode<ProjectData> projectNode,
+                                                    String projectModuleName,
+                                                    Path projectDirectory,
+                                                    String projectPath) {
+        ModuleData projectModule = new ModuleData(projectModuleName, SYSTEM_ID, projectModuleName, projectDirectory.toString(), projectPath);
+        DataNode<ModuleData> projectModuleNode = projectNode.createChild(ProjectKeys.MODULE, projectModule);
+        ContentRootData projectRoot = new ContentRootData(SYSTEM_ID, projectDirectory.toString());
+        for (String excluded : UnrealConstants.EXCLUDED_DIRECTORIES) {
+            projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
+        }
+        for (String excluded : UnrealConstants.EXCLUDED_PROJECT_DIRECTORIES) {
+            projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
+        }
+        for (Path pluginDirectory : UnrealUtil.findPluginDirectories(projectDirectory)) {
+            for (String excluded : UnrealConstants.EXCLUDED_PLUGIN_DIRECTORIES) {
+                Path directory = pluginDirectory.resolve(excluded);
+                if (Files.isDirectory(directory)) {
+                    projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, directory.toString());
+                }
+            }
+        }
+        projectModuleNode.createChild(ProjectKeys.CONTENT_ROOT, projectRoot);
+        return projectModuleNode;
+    }
+
+    /**
      * The engine as the project modules see it: a module of {@code Engine/Source/Programs} with the UnrealBuildTool
      * sources the build scripts compile against, and the C++ sources of {@code Engine/Source} as its exported library.
      * Every project module depends on it, so the engine headers are indexed once, with the defines and include paths of
      * all the project modules together.
      */
-    private static DataNode<ModuleData> createEngineModule(DataNode<ProjectData> projectNode,
+    static DataNode<ModuleData> createEngineModule(DataNode<ProjectData> projectNode,
                                                            UnrealEngine engine,
                                                            String projectPath,
                                                            Iterable<UnrealCompileSettings> projectSettings) {

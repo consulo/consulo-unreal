@@ -45,5 +45,6 @@
         <module>base</module>
         <module>csharp</module>
         <module>plugin</module>
+        <module>it</module>
     </modules>
 </project>
