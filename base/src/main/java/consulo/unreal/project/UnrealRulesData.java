@@ -34,7 +34,8 @@ import java.util.Objects;
  * @param files        the scripts, each becoming a single-file content entry
  * @param extensionIds module extensions to enable, parents first; missing ones (optional part not loaded) are skipped
  * @param engineHome   the engine whose bundle the extensions get - its UnrealBuildTool and .NET the scripts use
- * @param dependencies modules the scripts depend on - the engine module, which holds the UnrealBuildTool sources
+ * @param dependencies modules the scripts depend on (the UnrealBuildTool sources come as a library, see
+ *                     {@link UnrealEngineLibraryData})
  */
 public class UnrealRulesData extends AbstractExternalEntityData {
     private static final long serialVersionUID = 1L;

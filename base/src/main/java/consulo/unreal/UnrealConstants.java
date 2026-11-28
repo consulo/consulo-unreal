@@ -66,11 +66,16 @@ public interface UnrealConstants {
      */
     String ENGINE_LIBRARY_SUFFIX = " Sources";
 
+    /**
+     * Suffix of the library of the {@link #KEPT_ENGINE_PROGRAMS} sources: {@code UE 5.8.4 Build Sources}.
+     */
+    String ENGINE_BUILD_LIBRARY_SUFFIX = " Build Sources";
+
     String ENGINE_PROGRAMS_DIRECTORY = "Programs";
 
     /**
-     * The only {@code Engine/Source/Programs} kept: UnrealBuildTool and the {@code EpicGames.*} libraries it is built
-     * from, which the build scripts compile against.
+     * The {@code Engine/Source/Programs} the build scripts compile against: UnrealBuildTool and the {@code EpicGames.*}
+     * libraries it is built from.
      */
     List<String> KEPT_ENGINE_PROGRAMS = List.of("UnrealBuildTool", "Shared");
 

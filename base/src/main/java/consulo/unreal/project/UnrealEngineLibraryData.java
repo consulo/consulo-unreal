@@ -26,12 +26,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The C++ sources of the engine as a project library - a child of the {@link ProjectKeys#PROJECT} node.
- * {@link ProjectKeys#LIBRARY} cannot express it: its data has no excluded roots, and the engine sources are useful only
- * without their implementation and third party code.
+ * Sources of the engine as a project library - a child of the {@link ProjectKeys#PROJECT} node: the C++ sources the
+ * project modules include, and the UnrealBuildTool sources the build scripts compile against. They are never edited in a
+ * game project, so a library fits them better than a module. {@link ProjectKeys#LIBRARY} cannot express it: its data has
+ * no excluded roots, and the engine sources are useful only without their implementation and third party code.
  *
  * @param libraryName   e.g. {@code UE 5.8.4 Sources}
- * @param root          {@code Engine/Source}
+ * @param roots         e.g. {@code Engine/Source}
  * @param excludedRoots directories of the root which are not indexed
  * @param moduleNames   modules the library is added to; they decide the defines the engine headers are indexed with
  */
@@ -45,14 +46,14 @@ public class UnrealEngineLibraryData extends AbstractExternalEntityData {
         Key.create(UnrealEngineLibraryData.class, ProjectKeys.CONTENT_ROOT.getProcessingWeight() + 4);
 
     private final String myLibraryName;
-    private final String myRoot;
+    private final List<String> myRoots;
     private final List<String> myExcludedRoots;
     private final List<String> myModuleNames;
 
-    public UnrealEngineLibraryData(String libraryName, String root, List<String> excludedRoots, List<String> moduleNames) {
+    public UnrealEngineLibraryData(String libraryName, List<String> roots, List<String> excludedRoots, List<String> moduleNames) {
         super(UnrealConstants.SYSTEM_ID);
         myLibraryName = libraryName;
-        myRoot = root;
+        myRoots = List.copyOf(roots);
         myExcludedRoots = List.copyOf(excludedRoots);
         myModuleNames = List.copyOf(moduleNames);
     }
@@ -61,8 +62,8 @@ public class UnrealEngineLibraryData extends AbstractExternalEntityData {
         return myLibraryName;
     }
 
-    public String getRoot() {
-        return myRoot;
+    public List<String> getRoots() {
+        return myRoots;
     }
 
     public List<String> getExcludedRoots() {
@@ -79,13 +80,13 @@ public class UnrealEngineLibraryData extends AbstractExternalEntityData {
             return false;
         }
         return myLibraryName.equals(that.myLibraryName)
-            && myRoot.equals(that.myRoot)
+            && myRoots.equals(that.myRoots)
             && myExcludedRoots.equals(that.myExcludedRoots)
             && myModuleNames.equals(that.myModuleNames);
     }
 
     @Override
     public int hashCode() {
-        return 31 * super.hashCode() + Objects.hash(myLibraryName, myRoot, myExcludedRoots, myModuleNames);
+        return 31 * super.hashCode() + Objects.hash(myLibraryName, myRoots, myExcludedRoots, myModuleNames);
     }
 }

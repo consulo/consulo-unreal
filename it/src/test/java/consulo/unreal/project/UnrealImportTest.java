@@ -80,6 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class UnrealImportTest {
     private static final String PROJECT = "Game";
     private static final String ENGINE_MODULE = "UE 5.8.0";
+    private static final String RULES_MODULE = PROJECT + UnrealConstants.RULES_MODULE_SUFFIX;
 
     @Test
     public void importCreatesTheEngineLibraryWithItsExcludes(HeadlessProjects projects) throws Exception {
@@ -103,6 +104,16 @@ public class UnrealImportTest {
         LibraryOrderEntry libraryEntry = ReadAction.compute(() -> findLibraryEntry(engineModule, library));
         assertNotNull(libraryEntry, "the engine module must have the engine library");
         assertTrue(libraryEntry.isExported(), "the engine module must export the engine library to the project modules");
+
+        assertEquals(0, ReadAction.compute(() -> ModuleRootManager.getInstance(engineModule).getContentEntries().length),
+            "the engine module has no content - its sources are libraries");
+
+        Library buildLibrary = ReadAction.compute(() ->
+            ProjectLibraryTable.getInstance(project).getLibraryByName(ENGINE_MODULE + UnrealConstants.ENGINE_BUILD_LIBRARY_SUFFIX));
+        assertNotNull(buildLibrary, "the library of the UnrealBuildTool sources must be created");
+        assertEquals(List.of(VirtualFileUtil.pathToUrl(source.resolve("Programs/UnrealBuildTool").toString()),
+                VirtualFileUtil.pathToUrl(source.resolve("Programs/Shared").toString())),
+            List.of(buildLibrary.getUrls(BinariesOrderRootType.ID)));
 
         Module projectModule = findModule(project, PROJECT + UnrealConstants.PROJECT_FILE_EXTENSION);
         Set<String> excluded = ReadAction.compute(() -> excludedUrls(projectModule));
@@ -161,7 +172,7 @@ public class UnrealImportTest {
         UnrealProjectResolver.createProjectModule(projectNode, PROJECT + UnrealConstants.PROJECT_FILE_EXTENSION, projectDirectory, projectPath);
         UnrealEngine engine = new UnrealEngine(Platform.current(), engineHome);
         DataNode<ModuleData> engineModule =
-            UnrealProjectResolver.createEngineModule(projectNode, engine, projectPath, List.of(new UnrealCompileSettings()));
+            UnrealProjectResolver.createEngineModule(projectNode, engine, projectPath, RULES_MODULE, List.of(new UnrealCompileSettings()));
 
         Path gameSource = projectDirectory.resolve("Source").resolve(PROJECT);
         ModuleData gameModule = new ModuleData(PROJECT, UnrealConstants.SYSTEM_ID, PROJECT, gameSource.toString(), projectPath);

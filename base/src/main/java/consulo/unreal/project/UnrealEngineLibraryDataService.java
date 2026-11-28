@@ -35,13 +35,14 @@ import consulo.project.Project;
 import consulo.project.content.library.ProjectLibraryTable;
 import consulo.virtualFileSystem.util.VirtualFileUtil;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Creates the engine library of {@link UnrealEngineLibraryData} and adds it to its modules. Every import runs on project
+ * Creates the library of {@link UnrealEngineLibraryData} and adds it to its modules. Every import runs on project
  * open, so the library and the modules are changed only when they differ - an unchanged commit would rescan the project.
  */
 @ExtensionImpl
@@ -86,12 +87,15 @@ public class UnrealEngineLibraryDataService implements ProjectDataService<Unreal
             tableModel.commit();
         }
 
-        String rootUrl = VirtualFileUtil.pathToUrl(data.getRoot());
+        List<String> rootUrls = new ArrayList<>();
+        for (String root : data.getRoots()) {
+            rootUrls.add(VirtualFileUtil.pathToUrl(root));
+        }
         Set<String> excludedUrls = new TreeSet<>();
         for (String excluded : data.getExcludedRoots()) {
             excludedUrls.add(VirtualFileUtil.pathToUrl(excluded));
         }
-        if (isUpToDate(library, rootUrl, excludedUrls)) {
+        if (isUpToDate(library, rootUrls, excludedUrls)) {
             return library;
         }
 
@@ -100,7 +104,9 @@ public class UnrealEngineLibraryDataService implements ProjectDataService<Unreal
             for (String url : libraryModel.getUrls(rootType)) {
                 libraryModel.removeRoot(url, rootType);
             }
-            libraryModel.addRoot(rootUrl, rootType);
+            for (String url : rootUrls) {
+                libraryModel.addRoot(url, rootType);
+            }
         }
         for (String url : libraryModel.getExcludedRootUrls()) {
             libraryModel.removeExcludedRoot(url);
@@ -112,9 +118,9 @@ public class UnrealEngineLibraryDataService implements ProjectDataService<Unreal
         return library;
     }
 
-    private static boolean isUpToDate(Library library, String rootUrl, Set<String> excludedUrls) {
+    private static boolean isUpToDate(Library library, List<String> rootUrls, Set<String> excludedUrls) {
         for (String rootType : ROOT_TYPES) {
-            if (!List.of(library.getUrls(rootType)).equals(List.of(rootUrl))) {
+            if (!List.of(library.getUrls(rootType)).equals(rootUrls)) {
                 return false;
             }
         }

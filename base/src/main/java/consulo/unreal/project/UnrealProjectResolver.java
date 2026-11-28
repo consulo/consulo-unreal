@@ -48,7 +48,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static consulo.unreal.UnrealConstants.SYSTEM_ID;
 
@@ -58,8 +57,9 @@ import static consulo.unreal.UnrealConstants.SYSTEM_ID;
  * <li>{@code <Project>.uproject} - the project directory, its build output excluded</li>
  * <li>one module per C++ module of the project and its plugins ({@code -Mode=JsonExport}), with the include paths and
  * defines its sources compile with ({@code -Mode=GenerateClangDatabase})</li>
- * <li>{@code UE <version>} - {@code Engine/Source/Programs} for the build scripts, exporting the library
- * {@code UE <version> Sources} of {@code Engine/Source}, so engine headers are indexed and resolve their own includes</li>
+ * <li>{@code UE <version>} - a module without content exporting the library {@code UE <version> Sources} of
+ * {@code Engine/Source}, so engine headers are indexed and resolve their own includes; UnrealBuildTool's sources are the
+ * library {@code UE <version> Build Sources} of the build scripts module</li>
  * </ul>
  */
 public class UnrealProjectResolver implements ExternalSystemProjectResolver<UnrealExecutionSettings> {
@@ -103,8 +103,7 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
         }
 
         UnrealEngine engine = UnrealUtil.toEngine(settings, projectFile);
-        boolean indexEngineSources = settings == null || settings.isIndexEngineSources();
-        projectNode.createChild(UnrealRulesData.KEY, createRulesData(projectFile, engine, indexEngineSources));
+        projectNode.createChild(UnrealRulesData.KEY, createRulesData(projectFile, engine));
         String configuration = settings == null ? UnrealConstants.DEFAULT_CONFIGURATION : settings.getConfiguration();
         Path outputDirectory = projectDirectory.resolve(UnrealConstants.INTERMEDIATE_DIRECTORY).resolve(OUTPUT_DIRECTORY);
         try {
@@ -123,7 +122,8 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
 
         DataNode<ModuleData> engineModuleNode = null;
         if (settings == null || settings.isIndexEngineSources()) {
-            engineModuleNode = createEngineModule(projectNode, engine, projectPath, compileSettings.values());
+            engineModuleNode = createEngineModule(projectNode, engine, projectPath, projectFile.name() + UnrealConstants.RULES_MODULE_SUFFIX,
+                compileSettings.values());
         }
 
         Map<String, DataNode<ModuleData>> moduleNodes = new LinkedHashMap<>();
@@ -241,33 +241,24 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
     }
 
     /**
-     * The engine as the project modules see it: a module of {@code Engine/Source/Programs} with the UnrealBuildTool
-     * sources the build scripts compile against, and the C++ sources of {@code Engine/Source} as its exported library.
-     * Every project module depends on it, so the engine headers are indexed once, with the defines and include paths of
-     * all the project modules together.
+     * The engine as the project sees it, without content of its own - its sources are never edited in a game project:
+     * <ul>
+     * <li>a module exporting the library {@code UE <version> Sources} of {@code Engine/Source}. Every project module
+     * depends on it, so the engine headers are indexed once, with the defines and include paths of all the project
+     * modules together</li>
+     * <li>the library {@code UE <version> Build Sources} of UnrealBuildTool and the {@code EpicGames.*} libraries, for the
+     * module of the build scripts, which compile against them</li>
+     * </ul>
      */
     static DataNode<ModuleData> createEngineModule(DataNode<ProjectData> projectNode,
-                                                           UnrealEngine engine,
-                                                           String projectPath,
-                                                           Iterable<UnrealCompileSettings> projectSettings) {
+                                                   UnrealEngine engine,
+                                                   String projectPath,
+                                                   String rulesModuleName,
+                                                   Iterable<UnrealCompileSettings> projectSettings) {
         String name = engineModuleName(engine);
         Path sourceDirectory = engine.getSourceDirectory();
-        Path programs = sourceDirectory.resolve(UnrealConstants.ENGINE_PROGRAMS_DIRECTORY);
-        ModuleData moduleData = new ModuleData(name, SYSTEM_ID, name, programs.toString(), projectPath);
+        ModuleData moduleData = new ModuleData(name, SYSTEM_ID, name, sourceDirectory.toString(), projectPath);
         DataNode<ModuleData> moduleNode = projectNode.createChild(ProjectKeys.MODULE, moduleData);
-
-        ContentRootData contentRoot = new ContentRootData(SYSTEM_ID, programs.toString());
-        contentRoot.storePath(ExternalSystemSourceType.SOURCE, programs.toString());
-        try (Stream<Path> children = Files.list(programs)) {
-            children.filter(Files::isDirectory)
-                .filter(child -> !UnrealConstants.KEPT_ENGINE_PROGRAMS.contains(child.getFileName().toString()))
-                .sorted()
-                .forEach(child -> contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, child.toString()));
-        }
-        catch (IOException ignored) {
-            // no Programs directory in this engine
-        }
-        moduleNode.createChild(ProjectKeys.CONTENT_ROOT, contentRoot);
 
         UnrealCompileSettings settings = new UnrealCompileSettings();
         projectSettings.forEach(settings::addAll);
@@ -275,14 +266,30 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
 
         projectNode.createChild(UnrealEngineLibraryData.KEY, new UnrealEngineLibraryData(
             name + UnrealConstants.ENGINE_LIBRARY_SUFFIX,
-            sourceDirectory.toString(),
+            List.of(sourceDirectory.toString()),
             UnrealUtil.findEngineLibraryExcludes(sourceDirectory),
             List.of(name)
         ));
+
+        List<String> buildSources = new ArrayList<>();
+        for (String program : UnrealConstants.KEPT_ENGINE_PROGRAMS) {
+            Path directory = sourceDirectory.resolve(UnrealConstants.ENGINE_PROGRAMS_DIRECTORY).resolve(program);
+            if (Files.isDirectory(directory)) {
+                buildSources.add(directory.toString());
+            }
+        }
+        if (!buildSources.isEmpty()) {
+            projectNode.createChild(UnrealEngineLibraryData.KEY, new UnrealEngineLibraryData(
+                name + UnrealConstants.ENGINE_BUILD_LIBRARY_SUFFIX,
+                buildSources,
+                List.of(),
+                List.of(rulesModuleName)
+            ));
+        }
         return moduleNode;
     }
 
-    private static UnrealRulesData createRulesData(UProjectFile projectFile, UnrealEngine engine, boolean indexEngineSources) {
+    private static UnrealRulesData createRulesData(UProjectFile projectFile, UnrealEngine engine) {
         List<String> files = UnrealUtil.findBuildFiles(projectFile.getDirectory()).stream()
             .filter(UnrealUtil::isRulesFile)
             .map(Path::toString)
@@ -292,8 +299,8 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
             files,
             UnrealConstants.RULES_EXTENSION_IDS,
             engine.getHome().toString(),
-            // the engine module holds the UnrealBuildTool sources (Programs/UnrealBuildTool, Programs/Shared)
-            indexEngineSources ? List.of(engineModuleName(engine)) : List.of()
+            // the UnrealBuildTool sources come as the library UE <version> Build Sources
+            List.of()
         );
     }
 
