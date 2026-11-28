@@ -29,6 +29,8 @@ import consulo.unreal.project.UnrealRulesData;
 import consulo.unreal.project.UnrealRulesModuleContributor;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Makes every system library of the engine bundle - the .NET reference assemblies and UnrealBuildTool - a dependency of
@@ -45,17 +47,28 @@ public class UnrealDotNetRulesContributor implements UnrealRulesModuleContributo
         // the .NET extensions keep their bundle in a pointer of their own, not in ModuleExtensionWithSdk
         String engineHome = data.getEngineHome();
         Sdk engineSdk = engineHome == null ? null : UnrealEngineSdkType.findOrCreateSdk(Path.of(engineHome));
-        if (engineSdk != null) {
+        if (engineSdk != null && !engineSdk.getName().equals(mutableExtension.getInheritableSdk().getName())) {
             mutableExtension.getInheritableSdk().set(null, engineSdk.getName());
         }
 
+        // replaced only when the assemblies differ: an unchanged module must stay unchanged on re-import
         DotNetLibraryOrderEntryType type = DotNetLibraryOrderEntryType.getInstance();
+        List<String> assemblies = List.copyOf(mutableExtension.getAvailableSystemLibraries().keySet());
+        List<String> current = new ArrayList<>();
+        for (OrderEntry entry : rootModel.getOrderEntries()) {
+            if (entry.getType() == type) {
+                current.add(entry.getPresentableName());
+            }
+        }
+        if (current.equals(assemblies)) {
+            return;
+        }
         for (OrderEntry entry : rootModel.getOrderEntries()) {
             if (entry.getType() == type) {
                 rootModel.removeOrderEntry(entry);
             }
         }
-        for (String assemblyName : mutableExtension.getAvailableSystemLibraries().keySet()) {
+        for (String assemblyName : assemblies) {
             rootModel.addCustomOderEntry(type, new DotNetLibraryOrderEntryModel(assemblyName));
         }
     }

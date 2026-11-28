@@ -98,6 +98,17 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
         for (String excluded : UnrealConstants.EXCLUDED_DIRECTORIES) {
             projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
         }
+        for (String excluded : UnrealConstants.EXCLUDED_PROJECT_DIRECTORIES) {
+            projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, projectDirectory.resolve(excluded).toString());
+        }
+        for (Path pluginDirectory : UnrealUtil.findPluginDirectories(projectDirectory)) {
+            for (String excluded : UnrealConstants.EXCLUDED_PLUGIN_DIRECTORIES) {
+                Path directory = pluginDirectory.resolve(excluded);
+                if (Files.isDirectory(directory)) {
+                    projectRoot.storePath(ExternalSystemSourceType.EXCLUDED, directory.toString());
+                }
+            }
+        }
         projectModuleNode.createChild(ProjectKeys.CONTENT_ROOT, projectRoot);
         projectNode.createChild(UnrealRunData.KEY, new UnrealRunData(projectModuleName, projectFile.name()));
 
@@ -217,8 +228,10 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
     }
 
     /**
-     * {@code Engine/Source} compiles with what the project modules compile with: their include paths cover the engine
-     * modules they use.
+     * The engine as the project modules see it: a module of {@code Engine/Source/Programs} with the UnrealBuildTool
+     * sources the build scripts compile against, and the C++ sources of {@code Engine/Source} as its exported library.
+     * Every project module depends on it, so the engine headers are indexed once, with the defines and include paths of
+     * all the project modules together.
      */
     private static DataNode<ModuleData> createEngineModule(DataNode<ProjectData> projectNode,
                                                            UnrealEngine engine,
@@ -226,18 +239,16 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
                                                            Iterable<UnrealCompileSettings> projectSettings) {
         String name = engineModuleName(engine);
         Path sourceDirectory = engine.getSourceDirectory();
-        ModuleData moduleData = new ModuleData(name, SYSTEM_ID, name, sourceDirectory.toString(), projectPath);
+        Path programs = sourceDirectory.resolve(UnrealConstants.ENGINE_PROGRAMS_DIRECTORY);
+        ModuleData moduleData = new ModuleData(name, SYSTEM_ID, name, programs.toString(), projectPath);
         DataNode<ModuleData> moduleNode = projectNode.createChild(ProjectKeys.MODULE, moduleData);
 
-        ContentRootData contentRoot = new ContentRootData(SYSTEM_ID, sourceDirectory.toString());
-        contentRoot.storePath(ExternalSystemSourceType.SOURCE, sourceDirectory.toString());
-        for (String excluded : UnrealConstants.EXCLUDED_ENGINE_SOURCE_DIRECTORIES) {
-            contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, sourceDirectory.resolve(excluded).toString());
-        }
-        Path programs = sourceDirectory.resolve(UnrealConstants.ENGINE_PROGRAMS_DIRECTORY);
+        ContentRootData contentRoot = new ContentRootData(SYSTEM_ID, programs.toString());
+        contentRoot.storePath(ExternalSystemSourceType.SOURCE, programs.toString());
         try (Stream<Path> children = Files.list(programs)) {
             children.filter(Files::isDirectory)
                 .filter(child -> !UnrealConstants.KEPT_ENGINE_PROGRAMS.contains(child.getFileName().toString()))
+                .sorted()
                 .forEach(child -> contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, child.toString()));
         }
         catch (IOException ignored) {
@@ -248,6 +259,13 @@ public class UnrealProjectResolver implements ExternalSystemProjectResolver<Unre
         UnrealCompileSettings settings = new UnrealCompileSettings();
         projectSettings.forEach(settings::addAll);
         moduleNode.createChild(UnrealCompileData.KEY, toCompileData(settings));
+
+        projectNode.createChild(UnrealEngineLibraryData.KEY, new UnrealEngineLibraryData(
+            name + UnrealConstants.ENGINE_LIBRARY_SUFFIX,
+            sourceDirectory.toString(),
+            UnrealUtil.findEngineLibraryExcludes(sourceDirectory),
+            List.of(name)
+        ));
         return moduleNode;
     }
 

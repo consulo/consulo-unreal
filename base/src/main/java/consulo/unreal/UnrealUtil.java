@@ -33,8 +33,11 @@ import consulo.unreal.setting.UnrealSettings;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -244,6 +247,64 @@ public final class UnrealUtil {
             }
         }
         return files;
+    }
+
+    /**
+     * Directories of the project's plugins - the ones holding a {@code .uplugin} file - whose build output is excluded.
+     */
+    public static List<Path> findPluginDirectories(Path projectDirectory) {
+        Path root = projectDirectory.resolve(UnrealConstants.PLUGINS_DIRECTORY);
+        if (!Files.isDirectory(root)) {
+            return List.of();
+        }
+        List<Path> directories = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(root, MAX_BUILD_FILE_DEPTH)) {
+            paths.filter(path -> path.getFileName().toString().endsWith(UnrealConstants.PLUGIN_FILE_EXTENSION)
+                    && Files.isRegularFile(path)
+                    && !isUnderBuildOutput(root, path))
+                .map(Path::getParent)
+                .sorted()
+                .forEach(directories::add);
+        }
+        catch (IOException ignored) {
+        }
+        return directories;
+    }
+
+    /**
+     * What the engine library leaves out of {@code Engine/Source}: the third party code, the programs (UnrealBuildTool
+     * lives in the engine module) and the {@code Private} directory of every engine module.
+     */
+    public static List<String> findEngineLibraryExcludes(Path sourceDirectory) {
+        List<String> excludes = new ArrayList<>();
+        Path programs = sourceDirectory.resolve(UnrealConstants.ENGINE_PROGRAMS_DIRECTORY);
+        List<Path> topLevel = new ArrayList<>();
+        for (String directory : UnrealConstants.EXCLUDED_ENGINE_SOURCE_DIRECTORIES) {
+            topLevel.add(sourceDirectory.resolve(directory));
+        }
+        topLevel.add(programs);
+        try {
+            Files.walkFileTree(sourceDirectory, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                    if (topLevel.contains(directory)
+                        || directory.getFileName().toString().equals(UnrealConstants.ENGINE_PRIVATE_DIRECTORY)) {
+                        excludes.add(directory.toString());
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException e) {
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+        catch (IOException ignored) {
+        }
+        excludes.sort(null);
+        return excludes;
     }
 
     private static boolean isUnderBuildOutput(Path root, Path path) {

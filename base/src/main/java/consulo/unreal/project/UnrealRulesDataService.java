@@ -40,7 +40,9 @@ import consulo.unreal.engine.UnrealEngineSdkType;
 import consulo.virtualFileSystem.util.VirtualFileUtil;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Creates the module of the build scripts itself: without a directory, with every script as a single-file content entry,
@@ -82,23 +84,32 @@ public class UnrealRulesDataService implements ProjectDataService<UnrealRulesDat
         }
 
         ModifiableRootModel rootModel = ModuleRootManager.getInstance(module).getModifiableModel();
-        for (ContentEntry entry : rootModel.getContentEntries()) {
-            rootModel.removeContentEntry(entry);
-        }
-        for (String file : data.getFiles()) {
-            rootModel.addSingleContentEntry(VirtualFileUtil.pathToUrl(file));
-        }
-
-        for (OrderEntry entry : rootModel.getOrderEntries()) {
-            if (entry instanceof ModuleOrderEntry) {
-                rootModel.removeOrderEntry(entry);
+        // every import runs on project open: entries are only replaced when they differ, an unchanged module must stay
+        // unchanged, otherwise the commit fires a roots change and the whole project is rescanned
+        List<String> fileUrls = data.getFiles().stream().map(VirtualFileUtil::pathToUrl).toList();
+        if (!getContentUrls(rootModel).equals(fileUrls)) {
+            for (ContentEntry entry : rootModel.getContentEntries()) {
+                rootModel.removeContentEntry(entry);
+            }
+            for (String url : fileUrls) {
+                rootModel.addSingleContentEntry(url);
             }
         }
+
+        List<Module> dependencies = new ArrayList<>();
         for (String dependency : data.getDependencies()) {
             Module dependencyModule = moduleManager.findModuleByName(dependency);
             if (dependencyModule != null) {
-                rootModel.addModuleOrderEntry(dependencyModule);
+                dependencies.add(dependencyModule);
             }
+        }
+        if (!getModuleDependencies(rootModel).equals(dependencies)) {
+            for (OrderEntry entry : rootModel.getOrderEntries()) {
+                if (entry instanceof ModuleOrderEntry) {
+                    rootModel.removeOrderEntry(entry);
+                }
+            }
+            dependencies.forEach(rootModel::addModuleOrderEntry);
         }
 
         String engineHome = data.getEngineHome();
@@ -109,12 +120,16 @@ public class UnrealRulesDataService implements ProjectDataService<UnrealRulesDat
                 // provided by an optional part of the plugin which is not loaded
                 continue;
             }
-            extension.setEnabled(true);
+            if (!extension.isEnabled()) {
+                extension.setEnabled(true);
+            }
             // extensions with a bundle of their own kind (e.g. the .NET ones) bind it in their contributor
             if (engineSdk != null
                 && extension instanceof ModuleExtensionWithSdk<?> extensionWithSdk
                 && extensionWithSdk.getInheritableSdk() instanceof MutableModuleInheritableNamedPointer<Sdk> sdkPointer) {
-                sdkPointer.set(null, engineSdk.getName());
+                if (!engineSdk.getName().equals(sdkPointer.getName())) {
+                    sdkPointer.set(null, engineSdk.getName());
+                }
                 if (rootModel.findModuleExtensionSdkEntry(extensionWithSdk) == null) {
                     rootModel.addModuleExtensionSdkEntry(extensionWithSdk);
                 }
@@ -123,6 +138,29 @@ public class UnrealRulesDataService implements ProjectDataService<UnrealRulesDat
 
         Application.get().getExtensionPoint(UnrealRulesModuleContributor.class)
             .forEach(contributor -> contributor.contribute(rootModel, data));
-        rootModel.commit();
+        if (rootModel.isChanged()) {
+            rootModel.commit();
+        }
+        else {
+            rootModel.dispose();
+        }
+    }
+
+    private static List<String> getContentUrls(ModifiableRootModel rootModel) {
+        List<String> urls = new ArrayList<>();
+        for (ContentEntry entry : rootModel.getContentEntries()) {
+            urls.add(entry.getUrl());
+        }
+        return urls;
+    }
+
+    private static List<Module> getModuleDependencies(ModifiableRootModel rootModel) {
+        List<Module> modules = new ArrayList<>();
+        for (OrderEntry entry : rootModel.getOrderEntries()) {
+            if (entry instanceof ModuleOrderEntry moduleEntry) {
+                modules.add(moduleEntry.getModule());
+            }
+        }
+        return modules;
     }
 }

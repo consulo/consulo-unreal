@@ -41,9 +41,30 @@ public interface UnrealConstants {
     List<String> EXCLUDED_DIRECTORIES = List.of("Binaries", INTERMEDIATE_DIRECTORY, "Saved", "DerivedDataCache", ".vs");
 
     /**
+     * Directories of the project directory only: {@code Build} holds platform packaging files, not code.
+     */
+    List<String> EXCLUDED_PROJECT_DIRECTORIES = List.of("Build");
+
+    /**
+     * Build output of a plugin, next to its {@code .uplugin} file.
+     */
+    List<String> EXCLUDED_PLUGIN_DIRECTORIES = List.of("Binaries", INTERMEDIATE_DIRECTORY, "Saved");
+
+    /**
      * Directories of {@code Engine/Source} that are not part of the engine modules a game compiles against.
      */
     List<String> EXCLUDED_ENGINE_SOURCE_DIRECTORIES = List.of("ThirdParty");
+
+    /**
+     * The implementation of an engine module: a game only includes the other directories ({@code Public},
+     * {@code Classes}, {@code Internal}), so the engine library leaves it out - about half of the engine sources.
+     */
+    String ENGINE_PRIVATE_DIRECTORY = "Private";
+
+    /**
+     * Suffix of the library of the engine C++ sources, after the engine module name: {@code UE 5.8.4 Sources}.
+     */
+    String ENGINE_LIBRARY_SUFFIX = " Sources";
 
     String ENGINE_PROGRAMS_DIRECTORY = "Programs";
 
